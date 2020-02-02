@@ -12,5 +12,9 @@ polylines.js:
 
     Loading a file is done with a reader and the onload event handler. It's broken down
     into some initialization and then another state machine that interates over each line.
-    Malformed extents or polyline count cause the load to abort, while malformed point
-    count or coordinate pairs cause it to simply attempt to skip to the next.
+    Malformed extents are replaced with a defualt, and malformed polyline counts cause the 
+    load to abort, while malformed point count or coordinate pairs cause it to simply attempt
+    to skip to the next.
+
+    Default extents when they can not be found in a file are:
+        -1000, 1000, -1000, 1000

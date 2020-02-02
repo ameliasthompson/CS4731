@@ -188,7 +188,11 @@ function main() {
 
 						// Check for the appropriate number of lines, and then process.
 						if (extents.length != 4) {
-							readState = lineState.BAD;
+							// If this isn't a valid extents line, set default, move to polylines, and run this line again.
+							gl.viewport(0, 0, canvas.width, canvas.height);
+							gl.uniformMatrix4fv(projMatrix, false, flatten(ortho(-1000, 1000, -1000, 1000, -1, 1)));
+							i--;
+							readState = lineState.POLYLINES;
 							break;
 						}
 						const left = Number(extents[0]);
