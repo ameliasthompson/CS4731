@@ -1,6 +1,6 @@
 const state = {
-	DRAW : 1,
-	FILE : 2,
+	DRAW : 1,  // Draw mode.
+	FILE : 2,  // File mode.
 	LOADING: 3 // A file is being loaded right now.
 }
 
@@ -21,8 +21,9 @@ const lineState = {
 }
 
 function main() {
-	// Retrieve <canvas> element
+	// Retrieve elements
 	var canvas = document.getElementById('webgl');
+	var modep = document.getElementById('mode-text'); // This is used to indicate state.
 
 	// Get the rendering context for WebGL
 	var gl = WebGLUtils.setupWebGL(canvas);
@@ -45,6 +46,7 @@ function main() {
 
 	// Set default state.
 	var curState = state.DRAW;
+	modep.innerHTML = "DRAW";
 
 	// Create and bind the point buffer.
 	var pBuffer = gl.createBuffer();
@@ -115,6 +117,7 @@ function main() {
 				render(gl, objects);
 				
 				curState = state.DRAW;
+				modep.innerHTML = "DRAW";
 			
 			} else if (curState == state.DRAW) {
 				// If we're already in draw, set up a new object.
@@ -131,8 +134,9 @@ function main() {
 				break;
 			}
 		
-			// Otherwise transition to file mode:
-			curState = state.FILE;		
+			// Otherwise transition to loading mode mode:
+			curState = state.LOADING;
+			modep.innerHTML = "LOADING";
 			objects = []; // Clear any objects from either draw mode or previous file.
 			curObj = -1; // This just makes the loop a bit further down work out better.
 
@@ -283,11 +287,11 @@ function main() {
 				render(gl, objects);
 
 				curState = state.FILE; // Finally we're done and can do other things.
+				modep.innerHTML = "FILE";
 
 			}; // reader.onload()
 
 			// Finally we need to actually run that monstrocity above.
-			curState = state.LOADING; // Change state to loading so that nothing interrupts this.
 			reader.readAsText(file);
 
 			break;
@@ -327,6 +331,7 @@ function main() {
 	// handled by the event listeners.
 }
 
+// Buffer each object and make draw calls for them.
 function render(gl, objects) {
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
