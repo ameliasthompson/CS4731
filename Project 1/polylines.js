@@ -21,6 +21,11 @@ const lineState = {
 }
 
 function main() {
+	
+	/*******************************************************************
+	 * INITIALIZATION
+	 *******************************************************************/
+	
 	// Retrieve elements
 	var canvas = document.getElementById('webgl');
 	var modep = document.getElementById('mode-text'); // This is used to indicate state.
@@ -65,6 +70,10 @@ function main() {
 	// Set the default projection matrix.
 	var projMatrix = gl.getUniformLocation(program, "proj");
 	gl.uniformMatrix4fv(projMatrix, false, flatten(ortho(-1, 1, -1, 1, -1, 1)));
+
+	/*******************************************************************
+	 * EVENT HANDLERS
+	 *******************************************************************/
 
 	// Set up keypress listener.
 	// Lambda expressions are used to maintain access to variables in the
@@ -158,7 +167,11 @@ function main() {
 
 				// Return if the * line was the last line.
 				// This way we don't go out of bounds.
-				if (start == lines.length) { return; }
+				if (start == lines.length) { 
+					curState = state.FILE; // We're not attempting to load anymore.
+					modep.innerHTML = "FILE";
+					return;
+				}
 
 				// Now start processing in earnest.
 				var readState = lineState.EXTENTS;
