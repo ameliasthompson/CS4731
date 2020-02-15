@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project 1</title>
+ 
+	<script id="vshader" type="x-shader/x-vertex">
+  attribute vec4 vPosition;
+  uniform mat4 pulse;
+  uniform mat4 model; // Model matrix
+  uniform mat4 view;  // View matrix
+  uniform mat4 proj;  // Projection matrix
+
+  void main() {
+    gl_Position = proj * view * model * pulse * vPosition;	// Point position
+  }
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+  precision mediump float;
+
+  void main() {
+    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);	// White lines
+  }
+	</script>
+	
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+    
+    <script src="plyread.js"></script>
+
+  </head>
+ 
+  <body onload="main()" style="background-color: black; color: white;">
+  
+    <canvas id="webgl" width="400" height="400">
+    	Please use a browser that supports the "canvas" tag.
+    </canvas>
+
+    <input type="file" id="input" accept=".ply" />
+
+  </body>
+</html>
