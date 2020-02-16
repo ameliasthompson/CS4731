@@ -22,7 +22,7 @@ var transMode = 0; 	 // Whether to translate or not, and on which axis.
 
 const fov = 60;
 const padding = 1.2;
-const rotStep = 0.05;
+const rotStep = 0.1;
 var transStep = 0; // (This varies based on model size.)
 const pulseStep = 0.0025;
 
@@ -65,7 +65,7 @@ function main() {
 	gl.uniformMatrix4fv(projMatrix, false, flatten(perspective(fov, 1, 1, 100)));
 
 	// Set the default model view matrix
-	var modelViewMatrix = gl.getUniformLocation(program, "modelview");
+	var modelViewMatrix = gl.getUniformLocation(program, "view");
 	gl.uniformMatrix4fv(modelViewMatrix, false, flatten(
 		lookAt(vec3(0.0, 0.0, 0.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0))));
 
@@ -115,6 +115,9 @@ function read(event) {
 	pulseOn = false;
 	rotOn = false;
 	transMode = 0;
+	transX = 0;
+	transY = 0;
+	transZ = 0;
 
 	// Get the lines.
 	var lines = event.target.result.split(/\r?\n/);
@@ -288,7 +291,7 @@ function read(event) {
 	var depth = maxz - minz;
 
 	// Scale the transStep based on largest dimension.
-	transStep = 1 * Math.max(height, width, depth);
+	transStep = 0.005 * Math.max(height, width, depth);
 
 	// Update the perspective, modelview, and viewport.
 	// Find the distance the camera needs to be to perfectly frame the largest dimension.
@@ -307,7 +310,8 @@ function read(event) {
 	gl.uniformMatrix4fv(viewMatrix, false, flatten(lookAt(eye, center, vec3(0.0, 1.0, 0.0))));
 
 	var projMatrix = gl.getUniformLocation(program, "proj");
-	gl.uniformMatrix4fv(projMatrix, false, flatten(perspective(60, 1, 1, (distance + pulseMult*2)*padding + depth + pulseMult*2)));
+	// Set far to some arbitrarily large number, and near to an arbitrarily small number.
+	gl.uniformMatrix4fv(projMatrix, false, flatten(perspective(60, 1, Math.min(height, width, depth)/1000, ((distance + pulseMult*2)*padding + depth + pulseMult*2)*1000)));
 	gl.viewport(0, 0, canvas.width, canvas.height);
 
 }
