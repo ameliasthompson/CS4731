@@ -11,8 +11,23 @@ var transZ = 0.0;    // How much to translate the mesh by.
 var gl;              // Rendering context.
 var program;         // Program
 
+var pulseOn = false; // Whether or not pulse is on.
+var rotOn = false;   // Whether to rotate or not.
+var transMode = 0; 	 // Whether to translate or not, and on which axis.
+					 // Negative numbers indicate translating on the coorisponding axis in the other direction
+					 // 0 - Off
+					 // 1 - X
+					 // 2 - Y
+					 // 3 - Z
+
 const fov = 60;
 const padding = 1.2;
+const rotStep = 0.05;
+var transStep = 0; // (This varies based on model size.)
+const pulseStep = 0.0025;
+
+var lastFrame = 0; // Used for calculating delta time.
+var thisFrame = 0;
 
 function main() {
 	
@@ -56,6 +71,7 @@ function main() {
 
 	// Add listeners
 	fin.addEventListener('input', load);
+	document.addEventListener('keypress', keypress);
 
 	// Start the animation loop.
 	render();
@@ -96,6 +112,9 @@ function read(event) {
 	pulse = 0.0;
 	rot = 0.0;
 	trans = 0.0;
+	pulseOn = false;
+	rotOn = false;
+	transMode = 0;
 
 	// Get the lines.
 	var lines = event.target.result.split(/\r?\n/);
@@ -161,9 +180,9 @@ function read(event) {
 		
 		// >= 3 because there might be some trash at the end of the line like a space or something
 		if (v.length >= 3) {
-			var x = Number(v[0]);
+			var x = Number(v[2]);
 			var y = Number(v[1]);
-			var z = Number(v[2]);
+			var z = Number(v[0]);
 
 			// Check to make sure these are all valid.
 			if (x == NaN || y == NaN || z == NaN) {
@@ -268,13 +287,10 @@ function read(event) {
 	var width = maxx - minx;
 	var depth = maxz - minz;
 
-	/*
-	// Find the distance that's good enough.
-	var distance = -(Math.max(height, width, depth)*1.5);
-	*/
+	// Scale the transStep based on largest dimension.
+	transStep = 0.001 * Math.max(height, width, depth);
 
 	// Update the perspective, modelview, and viewport.
-
 	// Find the distance the camera needs to be to perfectly frame the largest dimension.
 	var distance = Math.max(height, width, depth) / 2 / Math.tan((fov/2)*(Math.PI/180));
 	distance -= Math.min(minx, miny, minz); // Offset to compensate for center of model.
@@ -301,7 +317,35 @@ function read(event) {
  * @param {*} event 
  */
 function keypress(event) {
-
+	switch (event.key) {
+	case 'x': // +x
+		// Turn +x translation on if no others are on. Otherwise turn them off.
+		transMode = (transMode == 0) ?  1 : 0;
+		break;
+	case 'c': // -x
+		transMode = (transMode == 0) ? -1 : 0;
+		break;
+	case 'y': // +y
+		transMode = (transMode == 0) ?  2 : 0;
+		break;
+	case 'u': // -y
+		transMode = (transMode == 0) ? -2 : 0;
+		break;
+	case 'z': // +z
+		transMode = (transMode == 0) ?  3 : 0;
+		break;
+	case 'a': // -z
+		transMode = (transMode == 0) ? -3 : 0;
+		break;
+	case 'r':
+		rotOn = !rotOn;
+		break;
+	case 'b':
+		pulseOn = !pulseOn;
+		break;
+	default:
+		break;
+	}
 }
 
 /**
@@ -313,6 +357,44 @@ function render() {
 	// Get some uniforms.
 	var pulseMatrix = gl.getUniformLocation(program, "pulse");
 	var modelMatrix = gl.getUniformLocation(program, "model");
+
+	// Get deltatime
+	lastFrame = thisFrame;
+	thisFrame = Date.now();
+	var dt = thisFrame - lastFrame;
+
+	// Update pukse, translation, and rotation.
+	if (pulseOn) {
+		pulse += pulseStep*dt;
+	}
+
+	if (rotOn) {
+		rot += rotStep*dt;
+	}
+
+	switch (transMode) {
+	default:
+	case 0:
+		break;
+	case 1:
+		transX += transStep*dt;
+		break;
+	case -1:
+		transX -= transStep*dt;
+		break;
+	case 2:
+		transY += transStep*dt;
+		break;
+	case -2:
+		transY -= transStep*dt;
+		break;
+	case 3:
+		transZ += transStep*dt;
+		break;
+	case -3:
+		transZ -= transStep*dt;
+		break;
+	}
 
 	// Set the model matrix
 	rtMat = mult(translate(transX, transY, transZ), rotateX(rot));
@@ -333,9 +415,6 @@ function render() {
 		gl.bufferData(gl.ARRAY_BUFFER, flatten(tris[i]), gl.STATIC_DRAW);
 		gl.drawArrays(gl.LINE_LOOP, 0, 3);
 	}
-
-	// Update values
-	pulse += 0.01;
 
 	requestAnimationFrame(render);
 }
