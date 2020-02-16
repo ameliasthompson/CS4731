@@ -288,7 +288,7 @@ function read(event) {
 	var depth = maxz - minz;
 
 	// Scale the transStep based on largest dimension.
-	transStep = 0.001 * Math.max(height, width, depth);
+	transStep = 1 * Math.max(height, width, depth);
 
 	// Update the perspective, modelview, and viewport.
 	// Find the distance the camera needs to be to perfectly frame the largest dimension.
@@ -318,28 +318,36 @@ function read(event) {
  */
 function keypress(event) {
 	switch (event.key) {
+	case 'X':
 	case 'x': // +x
 		// Turn +x translation on if no others are on. Otherwise turn them off.
 		transMode = (transMode == 0) ?  1 : 0;
 		break;
+	case 'C':
 	case 'c': // -x
 		transMode = (transMode == 0) ? -1 : 0;
 		break;
+	case 'Y':
 	case 'y': // +y
 		transMode = (transMode == 0) ?  2 : 0;
 		break;
+	case 'U':
 	case 'u': // -y
 		transMode = (transMode == 0) ? -2 : 0;
 		break;
+	case 'Z':
 	case 'z': // +z
 		transMode = (transMode == 0) ?  3 : 0;
 		break;
+	case 'A':
 	case 'a': // -z
 		transMode = (transMode == 0) ? -3 : 0;
 		break;
+	case 'R':
 	case 'r':
 		rotOn = !rotOn;
 		break;
+	case 'B':
 	case 'b':
 		pulseOn = !pulseOn;
 		break;
