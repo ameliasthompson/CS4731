@@ -41,13 +41,16 @@ var normBuf = null;
 
 // Uniform locations:
 var modelView = null;
-var color = null;
+var faceNorm = null;
 var diffProd = null;
 var specProd = null;
 var ambProd = null;
 
 // Root object:
 var root = null;
+
+// State:
+var wireframe = false;
 
 function main() {
 	
@@ -71,6 +74,8 @@ function main() {
 	// Set the gl stuff.
 	gl.clearColor(0.0, 0.0, 0.0, 1.0); // Black
 	gl.enable(gl.DEPTH_TEST);
+	gl.enable(gl.CULL_FACE);
+	gl.cullFace(gl.BACK);
 
 	// Add listeners
 	document.addEventListener('keypress', keypress);
@@ -98,13 +103,16 @@ function setShaders(vshader, fshader) {
 	normBuf = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
 	
+	// Not doing this check makes WebGL throw warnings when using flat-shader
 	var vNorm = gl.getAttribLocation(program, "vNormal");
-	gl.vertexAttribPointer(vNorm, 4, gl.FLOAT, false, 0, 0)
-	gl.enableVertexAttribArray(vNorm);
+	if (vNorm != -1) {
+		gl.vertexAttribPointer(vNorm, 4, gl.FLOAT, false, 0, 0)
+		gl.enableVertexAttribArray(vNorm);
+	}
 
 	// Find uniform locations.
 	modelView = gl.getUniformLocation(program, "modView");
-	color = gl.getUniformLocation(program, "color");
+	faceNorm = gl.getUniformLocation(program, "faceNorm");
 	diffProd = gl.getUniformLocation(program, "diffProd");
 	specProd = gl.getUniformLocation(program, "specProd");
 	ambProd = gl.getUniformLocation(program, "ambProd");
@@ -119,9 +127,9 @@ function triangle(tris, a, b, c) {
 	tris.p.push(b);
 	tris.p.push(c);
 	
-	tris.n.push(a[0],a[1], a[2], 0.0);
-	tris.n.push(b[0],b[1], b[2], 0.0);
-	tris.n.push(c[0],c[1], c[2], 0.0);
+	tris.n.push(vec4(a[0],a[1], a[2], 0.0));
+	tris.n.push(vec4(b[0],b[1], b[2], 0.0));
+	tris.n.push(vec4(c[0],c[1], c[2], 0.0));
 }
 
 function initCube(obj) {
@@ -151,12 +159,12 @@ function initCube(obj) {
 	triangle(tris, b, e, f);
 	triangle(tris, g, a, c); // Left face
 	triangle(tris, g, e, a);
-	triangle(tris, g, h, d); // Front face
-	triangle(tris, g, d, c);
-	triangle(tris, f, b, d); // Right face
-	triangle(tris, f, d, h);
-	triangle(tris, f, h, g); // Top face
-	triangle(tris, f, g, e);
+	triangle(tris, g, d, h); // Front face
+	triangle(tris, g, c, d);
+	triangle(tris, f, d, b); // Right face
+	triangle(tris, f, h, d);
+	triangle(tris, f, g, h); // Top face
+	triangle(tris, f, e, g);
 
 	return tris;
 }
@@ -211,6 +219,12 @@ function keypress(event) {
 	case 'M':
 		setShaders("flat-shader", "frag-shader");
 		break;
+	case 'x':
+		wireframe = !wireframe;
+		break;
+	case 'z':
+		setShaders("shadeless-shader", "frag-shader");
+		break;
 	default:
 		break;
 	}
@@ -257,8 +271,10 @@ function renderObj(obj, mat, width, dt, depth) {
 	
 
 	// Draw triangles
-	for(i = 0; i < obj.tris.p.length; i += 3)
-		gl.drawArrays(gl.TRIANGLES, i, 3);
+	for(i = 0; i < obj.tris.p.length; i += 3) {
+		gl.uniform4fv(faceNorm, flatten(obj.tris.n[i]));
+		gl.drawArrays(wireframe ? gl.LINE_LOOP : gl.TRIANGLES, i, 3);
+	}
 	
 
 	// Render children.
