@@ -450,6 +450,7 @@ function renderSkele(obj, mat, width, depth) {
 
 		// Construct the skeleton segment.
 		// This has to be done here due to the width multiplier.
+		// It isn't the worst thing in the world because this is done six times per frame.
 		var skele = [
 			vec4(0.0, 0.0, 0.0, 1.0),                  // Center of the object.
 			vec4(0.0, -obj.y - midpoint, 0.0, 1.0),    // Directly above
