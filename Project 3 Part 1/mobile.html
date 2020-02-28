@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Project 3 Part 1</title>
+ 
+    <script id="flat-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition; // Vertex position
+      attribute vec4 vNormal;   // Vertex normal
+      uniform vec4 diffProd;    // Lighting products
+      uniform vec4 specProd;
+      uniform vec4 ambProd;
+      uniform vec3 lightPos;    // Light position
+      uniform vec3 lightDir;    // Light direction
+      uniform float lightDeg;   // Spotlight cuttoff angle
+      uniform mat4 proj;        // Projection matrix
+      uniform mat4 modView;     // Model view matrix
+      uniform vec4 faceNorm;    // Face normals for flat shading
+
+      varying vec4 col;
+
+      void main() {
+        // Lighting
+        vec3 pos = (modView * vPosition).xyz;
+
+        vec3 L = normalize(lightPos - pos);
+        vec3 N = normalize(modView * faceNorm).xyz;
+        vec3 V = normalize(-pos);
+        vec3 R = (2.0 * dot(L, N) * N) - L;
+
+        vec4 diffuse, specular;
+        if (dot(L, -lightDir) > lightDeg) {
+          diffuse = diffProd * dot(L, N);
+          specular = specProd * pow(max(dot(V,R), 0.0), 10.0);
+        } else {
+          diffuse = vec4(0.0, 0.0, 0.0, 0.0);
+          specular = vec4(0.0, 0.0, 0.0, 0.0);
+        }
+
+        vec4 ambient = ambProd;
+
+        col = diffuse + specular + ambient;
+        col.a = 1.0;
+
+        // Position
+        gl_Position = proj * modView * vPosition;
+      }
+    </script>
+  
+    <script id="smooth-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition; // Vertex position
+      attribute vec4 vNormal;   // Vertex normal
+      uniform vec4 diffProd;    // Lighting products
+      uniform vec4 specProd;
+      uniform vec4 ambProd;
+      uniform vec3 lightPos;    // Light position
+      uniform vec3 lightDir;    // Light direction
+      uniform float lightDeg;   // Spotlight cuttoff angle
+      uniform mat4 proj;        // Projection matrix
+      uniform mat4 modView;     // Model view matrix
+      uniform vec4 faceNorm;    // Face normals for flat shading
+      
+      varying vec4 col;
+
+      void main() {
+        // Lighting
+        vec3 pos = (modView * vPosition).xyz;
+
+        vec3 L = normalize(lightPos - pos);
+        vec3 N = normalize(modView * vNormal).xyz;
+        vec3 V = normalize(-pos);
+        vec3 R = (2.0 * dot(L, N) * N) - L;
+
+        vec4 diffuse, specular;
+        if (dot(L, -lightDir) > lightDeg) {
+          diffuse = diffProd * dot(L, N);
+          specular = specProd * pow(max(dot(V,R), 0.0), 10.0);
+        } else {
+          diffuse = vec4(0.0, 0.0, 0.0, 0.0);
+          specular = vec4(0.0, 0.0, 0.0, 0.0);
+        }
+
+        vec4 ambient = ambProd;
+
+        col = diffuse + specular + ambient;
+        col.a = 1.0;
+
+        // Position
+        gl_Position = proj * modView * vPosition;
+      }
+    </script>
+
+    <script id="smooth-normal-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition; // Vertex position
+      attribute vec4 vNormal;   // Vertex normal
+      uniform vec4 diffProd;    // Lighting products
+      uniform vec4 specProd;
+      uniform vec4 ambProd;
+      uniform vec3 lightPos;    // Light position
+      uniform vec3 lightDir;    // Light direction
+      uniform float lightDeg;   // Spotlight cuttoff angle
+      uniform mat4 proj;        // Projection matrix
+      uniform mat4 modView;     // Model view matrix
+      uniform vec4 faceNorm;    // Face normals for flat shading
+      
+      varying vec4 col;
+    
+      void main() {
+        // Normal coloration
+        col.xyz = normalize(modView * vNormal).xyz;
+        col.a = 1.0;
+    
+        // Position
+        gl_Position = proj * modView * vPosition;
+      }
+    </script>
+
+    <script id="flat-normal-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition; // Vertex position
+      attribute vec4 vNormal;   // Vertex normal
+      uniform vec4 diffProd;    // Lighting products
+      uniform vec4 specProd;
+      uniform vec4 ambProd;
+      uniform vec3 lightPos;    // Light position
+      uniform vec3 lightDir;    // Light direction
+      uniform float lightDeg;   // Spotlight cuttoff angle
+      uniform mat4 proj;        // Projection matrix
+      uniform mat4 modView;     // Model view matrix
+      uniform vec4 faceNorm;    // Face normals for flat shading
+    
+      varying vec4 col;
+    
+      void main() {
+        // Normal coloration
+        col.xyz = normalize(modView * faceNorm).xyz;
+        col.a = 1.0;
+    
+        // Position
+        gl_Position = proj * modView * vPosition;
+      }
+    </script>
+
+    <script id="shadeless-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition; // Vertex position
+      attribute vec4 vNormal;   // Vertex normal
+      uniform vec4 diffProd;    // Lighting products
+      uniform vec4 specProd;
+      uniform vec4 ambProd;
+      uniform vec3 lightPos;    // Light position
+      uniform vec3 lightDir;    // Light direction
+      uniform float lightDeg;   // Spotlight cuttoff angle
+      uniform mat4 proj;        // Projection matrix
+      uniform mat4 modView;     // Model view matrix
+      uniform vec4 faceNorm;    // Face normals for flat shading
+      
+      varying vec4 col;
+
+      void main() {
+        // Color
+        col = diffProd;
+
+        // Position
+        gl_Position = proj * modView * vPosition;
+      }
+    </script>
+    
+    <script id="frag-shader" type="x-shader/x-fragment">
+      precision mediump float;
+
+      varying vec4 col;
+
+      void main() {
+        gl_FragColor = col;
+      }
+    </script>
+
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+    
+    <script src="mobile.js"></script>
+
+  </head>
+ 
+  <body onload="main()" style="background-color: black; color: white;">
+  
+    <canvas id="webgl" width="400" height="400">
+    	Please use a browser that supports the "canvas" tag.
+    </canvas>
+
+  </body>
+</html>
