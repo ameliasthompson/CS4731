@@ -1,3 +1,6 @@
+IMPORTANT NOTE: The mobile is generated randomly. If the colors or the overall
+    shape of the mobile aren't particularly interesting, just refresh the page.
+
 The program is entirely inside mobile.js, while mobile.html contains only the
 shader code for several different shaders and the page layout. Most variables
 that regard the state of the program are globals.
