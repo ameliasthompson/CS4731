@@ -197,6 +197,11 @@ const floorMesh = {
 	]
 }
 
+// Shadows
+const shadowMat = mat4();
+shadowMat[3][3] = 0;
+shadowMat[3][2] = -1/lightPos[2];
+
 
 function main() {
 	
@@ -760,7 +765,17 @@ function renderObj(obj, mat, width, depth) {
 		mat = rot;
 	}
 
+	// Render the mesh
+	gl.uniform1i(lightOn, true);
 	renderMesh(obj.tris, mat, obj.color);
+
+	// Render the shadows
+	var lightMat = translate(lightPos[0], lightPos[1], lightPos[2]);
+	lightMat = mult(lightMat, shadowMat);
+	lightMat = mult(lightMat, translate(-lightPos[0], -lightPos[1], -lightPos[2]));
+	lightMat = mult(lightMat, mat);
+	gl.uniform1i(lightOn, false);
+	renderMesh(obj.tris, lightMat, lightAmb);
 
 	// Render children.
 	if (obj.left != null) { renderObj(obj.left, mat, width*wdMult, depth+1); }
@@ -816,7 +831,7 @@ function render() {
 
 	// Set textures off and turn on lighting for mobile.
 	gl.uniform1i(useTexture, false);
-	gl.uniform1i(lightOn, true);
+	
 
 	// Use DFS to update and render render every object.
 	if (root != null) {
@@ -825,11 +840,11 @@ function render() {
 		renderObj(root, null, initialWidth, 0);
 	}
 
+	// Turn off lighting on walls and floor
+	gl.uniform1i(lightOn, false);
+
 	// Enable textures for the walls and floor if that's on
 	if (texturing) { gl.uniform1i(useTexture, true); }
-
-	// Turn off lighting on walls and floor.
-	gl.uniform1i(lightOn, false);
 
 	// Set texture for walls and render
 	gl.bindTexture(gl.TEXTURE_2D, stones);
