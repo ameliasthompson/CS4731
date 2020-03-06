@@ -66,31 +66,42 @@ var specProd = null;
 var ambProd = null;
 var lightDeg = null;
 var lightOn = null;
+var vReflectOn = null;
+var vRefractOn = null;
 
 // Fragment shader uniform locations:
 var useTexture = null;
+var fReflectOn = null;
+var fRefractOn = null;
 
 // The mobile:
 var root = null;
 
 // State:
 var wireframe = false;
-var shadows = false;
+var shadows = true;
 var texturing = true;
 var reflection = false;
 var refraction = false;
 var lDeg = 0.95;
 
 // Textures:
+const placeholderTex = new Uint8Array([0, 0, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255]);
 var debug = null;
 var grass = null;
 var stones = null;
-var nvnegx = null;
-var nvnegy = null;
-var nvnegz = null;
-var nvposx = null;
-var nvposy = null;
-var nvposz = null;
+var cubemap = null;
+
+// Cubemap images:
+var nvnegximg = null;
+var nvnegyimg = null;
+var nvnegzimg = null;
+var nvposximg = null;
+var nvposyimg = null;
+var nvposzimg = null;
+
+// Cubemap segments loaded:
+var cubeSegsLoaded = 0;
 
 // Walls/floor:
 const negx = -8.0;
@@ -216,6 +227,9 @@ function main() {
 		return;
 	}
 
+	// Load images and make them textures
+	loadAllImages();
+
 	// Set up the default shaders.
 	setShaders("smooth-shader", "frag-shader");
 
@@ -227,9 +241,6 @@ function main() {
 	gl.enable(gl.DEPTH_TEST);
 	gl.enable(gl.CULL_FACE);
 	gl.cullFace(gl.BACK);
-
-	// Load images and make them textures
-	loadAllImages();
 
 	// Add listeners
 	document.addEventListener('keypress', keypress);
@@ -250,12 +261,13 @@ function loadAllImages() {
 	debug = createTexture(null);
 	grass = createTexture(null);
 	stones = createTexture(null);
-	nvnegx = createTexture(null);
-	nvnegy = createTexture(null);
-	nvnegz = createTexture(null);
-	nvposx = createTexture(null);
-	nvposy = createTexture(null);
-	nvposz = createTexture(null);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_NEGATIVE_X);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_POSITIVE_X);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_POSITIVE_Y);
+	createCubemap(null, gl.TEXTURE_CUBE_MAP_POSITIVE_Z);
+	
 
 	// Load all images, and replace the placeholders when loaded.
 	var grassimg = new Image();
@@ -268,35 +280,93 @@ function loadAllImages() {
 	stonesimg.src = "http://web.cs.wpi.edu/~jmcuneo/stones.bmp";
 	stonesimg.onload = function() { stones = createTexture(stonesimg); }
 
-	var nvnegximg = new Image();
+	nvnegximg = new Image();
 	nvnegximg.crossOrigin = "";
 	nvnegximg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvnegx.bmp";
-	nvnegximg.onload = function() { nvnegx = createTexture(nvnegximg); }
+	nvnegximg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
 
-	var nvnegyimg = new Image();
+	nvnegyimg = new Image();
 	nvnegyimg.crossOrigin = "";
 	nvnegyimg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvnegy.bmp";
-	nvnegyimg.onload = function() { nvnegy = createTexture(nvnegyimg); }
+	nvnegyimg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
 
-	var nvnegzimg = new Image();
+	nvnegzimg = new Image();
 	nvnegzimg.crossOrigin = "";
 	nvnegzimg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvnegz.bmp";
-	nvnegzimg.onload = function() { nvnegz = createTexture(nvnegzimg); }
+	nvnegzimg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
 
-	var nvposximg = new Image();
+	nvposximg = new Image();
 	nvposximg.crossOrigin = "";
 	nvposximg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposx.bmp";
-	nvposximg.onload = function() { nvposx = createTexture(nvposximg); }
+	nvposximg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
 
-	var nvposyimg = new Image();
+	nvposyimg = new Image();
 	nvposyimg.crossOrigin = "";
 	nvposyimg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposy.bmp";
-	nvposyimg.onload = function() { nvposy = createTexture(nvposyimg); }
+	nvposyimg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
 
-	var nvposzimg = new Image();
+	nvposzimg = new Image();
 	nvposzimg.crossOrigin = "";
 	nvposzimg.src = "http://web.cs.wpi.edu/~jmcuneo/env_map_sides/nvposz.bmp";
-	nvposzimg.onload = function() { nvposz = createTexture(nvposzimg); }
+	nvposzimg.onload = function() {
+		cubeSegsLoaded++;
+		createCubemap();
+	}
+}
+
+function createCubemap() {
+	// If this is the first time running, create the default cubemap.
+	if (cubemap == null) {
+		cubemap = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemap);
+
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
+	}
+
+	// If this is the last time running, create the cubemap from the loaded images
+	if (cubeSegsLoaded == 6) {
+		cubemap = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE1);
+		cubemap = gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemap);
+
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvnegximg);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvnegyimg);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvnegzimg);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvposximg);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvposyimg);
+		gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, nvposzimg);
+	}
 }
 
 /**
@@ -308,6 +378,7 @@ function loadAllImages() {
  */
 function createTexture(img) {
 	var tex = gl.createTexture();
+	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, tex);
 
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -320,9 +391,7 @@ function createTexture(img) {
 	// If an image is not provided, create a texture.
 	} else {
 		gl.texImage2D(
-			gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-			new Uint8Array([0, 0, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255])
-		);
+			gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, placeholderTex);
 	}
 
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -378,13 +447,27 @@ function setShaders(vshader, fshader) {
 	ambProd = gl.getUniformLocation(program, "ambProd");
 	lightDeg = gl.getUniformLocation(program, "lightDeg");
 	lightOn = gl.getUniformLocation(program, "lightOn");
+	vReflectOn = gl.getUniformLocation(program, "vReflectOn");
+	vRefractOn = gl.getUniformLocation(program, "vRefractOn");
 
 	// Find fragment shader uniform locations.
 	useTexture = gl.getUniformLocation(program, "useTexture");
+	fReflectOn = gl.getUniformLocation(program, "fReflectOn");
+	fRefractOn = gl.getUniformLocation(program, "fRefractOn");
+
+	// Set reflection and refraction.
+	gl.uniform1i(vReflectOn, reflection);
+	gl.uniform1i(vRefractOn, refraction);
+	gl.uniform1i(fReflectOn, reflection);
+	gl.uniform1i(fRefractOn, refraction);
 
 	// Set default texture level.
 	var activeTexture = gl.getUniformLocation(program, "texture");
 	gl.uniform1i(activeTexture, 0);
+
+	// Set cubemap.
+	var cubemapLoc = gl.getUniformLocation(program, "cubeMap");
+	gl.uniform1i(cubemapLoc, 1);
 
 	// Set the default projection matrix.
 	var projMatrix = gl.getUniformLocation(program, "proj");
@@ -652,9 +735,25 @@ function keypress(event) {
 	case 'z':
 		setShaders("shadeless-shader", "frag-shader");
 		break;
+	case 'A':
+	case 'a':
+		shadows = !shadows;
+		break;
 	case 'B':
 	case 'b':
 		texturing = !texturing;
+		break;
+	case 'C':
+	case 'c':
+		reflection = !reflection;
+		gl.uniform1i(vReflectOn, reflection);
+		gl.uniform1i(fReflectOn, reflection);
+		break;
+	case 'D':
+	case 'd':
+		refraction = !refraction;
+		gl.uniform1i(vRefractOn, refraction);
+		gl.uniform1i(fRefractOn, refraction);
 		break;
 	default:
 		break;
@@ -769,13 +868,27 @@ function renderObj(obj, mat, width, depth) {
 	gl.uniform1i(lightOn, true);
 	renderMesh(obj.tris, mat, obj.color);
 
-	// Render the shadows
-	var lightMat = translate(lightPos[0], lightPos[1], lightPos[2]);
-	lightMat = mult(lightMat, shadowMat);
-	lightMat = mult(lightMat, translate(-lightPos[0], -lightPos[1], -lightPos[2]));
-	lightMat = mult(lightMat, mat);
-	gl.uniform1i(lightOn, false);
-	renderMesh(obj.tris, lightMat, lightAmb);
+	if (shadows) {
+		// Turn off reflection/refraction
+		gl.uniform1i(vReflectOn, false);
+		gl.uniform1i(fReflectOn, false);
+		gl.uniform1i(vRefractOn, false);
+		gl.uniform1i(fRefractOn, false);
+
+		// Render the shadows
+		var lightMat = translate(lightPos[0], lightPos[1], lightPos[2]);
+		lightMat = mult(lightMat, shadowMat);
+		lightMat = mult(lightMat, translate(-lightPos[0], -lightPos[1], -lightPos[2]));
+		lightMat = mult(lightMat, mat);
+		gl.uniform1i(lightOn, false);
+		renderMesh(obj.tris, lightMat, lightAmb);
+
+		// Turn them back on
+		gl.uniform1i(vReflectOn, reflection);
+		gl.uniform1i(fReflectOn, reflection);
+		gl.uniform1i(vRefractOn, refraction);
+		gl.uniform1i(fRefractOn, refraction);
+	}
 
 	// Render children.
 	if (obj.left != null) { renderObj(obj.left, mat, width*wdMult, depth+1); }
@@ -847,10 +960,12 @@ function render() {
 	if (texturing) { gl.uniform1i(useTexture, true); }
 
 	// Set texture for walls and render
+	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, stones);
 	renderMesh(wallMesh, sceneModelMat, vec4(0.0, 0.0, 1.0, 1.0));
 	
 	// Set texture for floor and render
+	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, grass);
 	renderMesh(floorMesh, sceneModelMat, vec4(0.5, 0.5, 0.5, 1.0));
 

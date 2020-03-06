@@ -51,44 +51,51 @@
       attribute vec4 vPosition; // Vertex position
       attribute vec4 vNormal;   // Vertex normal
       attribute vec2 vTcoord;   // Vertex texture coordinates
-      uniform vec4 diffProd;    // Lighting products
+      
+      uniform vec4 diffProd;   // Lighting products
       uniform vec4 specProd;
       uniform vec4 ambProd;
-      uniform vec3 lightPos;    // Light position
-      uniform vec3 lightDir;    // Light direction
-      uniform float lightDeg;   // Spotlight cuttoff angle
-      uniform bool lightOn;     // Whether to light or use fulbright
-      uniform mat4 proj;        // Projection matrix
-      uniform mat4 modView;     // Model view matrix
-      uniform vec4 faceNorm;    // Face normals for flat shading
+      uniform vec3 lightPos;   // Light position
+      uniform vec3 lightDir;   // Light direction
+      uniform float lightDeg;  // Spotlight cuttoff angle
+      uniform bool lightOn;    // Whether to light or use fulbright
+      uniform mat4 proj;       // Projection matrix
+      uniform mat4 modView;    // Model view matrix
+      uniform vec4 faceNorm;   // Face normals for flat shading
+      uniform bool vReflectOn; // Whether or not to reflect
+      uniform bool vRefractOn; // Whether or not to refract
       
       varying vec4 col;    // Vertex color for fragment shader
       varying vec2 tcoord; // Texture coordinates for fragment shader
+      varying vec3 Refl;   // Reflection vector
+      varying vec3 Refr;   // Refraction vector
 
       void main() {
-        // Texturing
+        // -- Texturing --
         tcoord = vTcoord;
         
-        // Lighting
+
+        // -- Lighting --
+        vec3 pos = (modView * vPosition).xyz;
+
+        vec3 L = normalize(lightPos - pos);
+        vec3 N = normalize(modView * vNormal).xyz;
+        vec3 V = normalize(-pos);
+        vec3 R = (2.0 * dot(L, N) * N) - L;
+
+        vec4 diffuse, specular;
+        if (dot(L, -lightDir) > lightDeg) {
+          diffuse = diffProd * dot(L, N);
+          specular = specProd * pow(max(dot(V,R), 0.0), 10.0);
+        } else {
+          diffuse = vec4(0.0, 0.0, 0.0, 0.0);
+          specular = vec4(0.0, 0.0, 0.0, 0.0);
+        }
+      
+        vec4 ambient = ambProd;
+
+        // If lighting is on, apply these things.
         if (lightOn) {
-          vec3 pos = (modView * vPosition).xyz;
-
-          vec3 L = normalize(lightPos - pos);
-          vec3 N = normalize(modView * vNormal).xyz;
-          vec3 V = normalize(-pos);
-          vec3 R = (2.0 * dot(L, N) * N) - L;
-
-          vec4 diffuse, specular;
-          if (dot(L, -lightDir) > lightDeg) {
-            diffuse = diffProd * dot(L, N);
-            specular = specProd * pow(max(dot(V,R), 0.0), 10.0);
-          } else {
-            diffuse = vec4(0.0, 0.0, 0.0, 0.0);
-            specular = vec4(0.0, 0.0, 0.0, 0.0);
-          }
-        
-          vec4 ambient = ambProd;
-
           col = diffuse + specular + ambient;
           col.a = 1.0;
 
@@ -97,7 +104,18 @@
           col = diffProd;
         }
 
-        // Position
+
+        // -- Reflection/Refraction --
+        if (vReflectOn) {
+          Refl = reflect(pos, N);
+        }
+
+        if (vRefractOn) {
+          Refr = refract(pos, N, 0.95);
+        }
+
+        
+        // -- Position --
         gl_Position = proj * modView * vPosition;
       }
     </script>
@@ -181,13 +199,38 @@
 
       varying vec4 col;    // Color from vertex shader
       varying vec2 tcoord; // Texture coordinates from vertex shader
+      varying vec3 Refl;   // Reflection vector
+      varying vec3 Refr;   // Refraction vector
 
-      uniform sampler2D texture; // Texture to render with
-      uniform bool useTexture;   // Whether or not to use a texture
+      uniform sampler2D texture;   // Texture to render with
+      uniform samplerCube cubeMap; // Texture to render reflections/refractions with
+      uniform bool useTexture;     // Whether or not to use a texture
+      uniform bool fReflectOn;     // Whether to reflect or not
+      uniform bool fRefractOn;     // Whether to refract or not
 
       void main() {
+        
+        // Textures take priority over all else.
         if (useTexture) {
           gl_FragColor = texture2D(texture, tcoord);
+        
+        // Reflection and reflection have second priority.
+        } else if (fReflectOn || fRefractOn) {
+          vec4 mapCol;
+
+          // If we're doing both
+          if (fReflectOn && fRefractOn) {
+            mapCol = textureCube(cubeMap, Refl);
+            mapCol = mapCol*textureCube(cubeMap, Refr);
+          
+          // If we're only reflecting or refracting
+          } else {
+            mapCol = fReflectOn ? textureCube(cubeMap, Refl) : textureCube(cubeMap, Refr);
+          }
+
+          gl_FragColor = col*mapCol;
+
+        // Normal shading has last priority.
         } else {
           gl_FragColor = col;
         }
