@@ -1,8 +1,5 @@
 // Additional features
 //   -Press x to toggle between wireframe and solid
-//   -Press n to view smooth shaded normals
-//   -Press N to view flat shaded normals
-//   -Press z to view with no shading
 
 // Globals
 
@@ -43,7 +40,7 @@ const projMat = flatten(perspective(cameraFov, 1, 0.01, 100));
 const viewMat = lookAt(cameraPos, cameraAt, vec3(0.0, 1.0, 0.0));
 
 // Lighting:
-const lightPos = vec3(3.0, 4.0, 8.0);
+const lightPos = vec3(3.0, 8.0, 8.0);
 const lightAmb = vec4(0.1, 0.1, 0.1, 1.0);
 const lightDiff = vec4(1.0, 1.0, 1.0, 1.0);
 const lightSpec = vec4(1.0, 1.0, 1.0, 1.0);
@@ -83,7 +80,7 @@ var shadows = true;
 var texturing = true;
 var reflection = false;
 var refraction = false;
-var lDeg = 0.95;
+var lDeg = 0.973;
 
 // Textures:
 const placeholderTex = new Uint8Array([0, 0, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255]);
@@ -111,6 +108,7 @@ const posx = 8.0;
 const posy = 4.0;
 const posz = 8.0;
 const sceneModelMat = translate(0, 0, 0);
+const sceneModelView = mult(viewMat, sceneModelMat);
 const wallTexScale = 0.15;
 const wallMesh = {
 	p : [
@@ -208,11 +206,37 @@ const floorMesh = {
 	]
 }
 
-// Shadows
-const shadowMat = mat4();
-shadowMat[3][3] = 0;
-shadowMat[3][2] = -1/lightPos[2];
+// Translations for light
+const toLightMat = translate(lightPos[0], lightPos[1], lightPos[2])
+const fromLightMat = translate(-lightPos[0], -lightPos[1], -lightPos[2])
 
+// Shadows
+const shadowMatX = mat4(
+	vec4(1.0, 0.0, 0.0, 0.0),
+	vec4(0.0, 1.0, 0.0, 0.0),
+	vec4(0.0, 0.0, 1.0, 0.0),
+	vec4(-1.0 / lightPos[0], 0.0, 0.0, 0.0)
+);
+const shadowMatY = mat4(
+	vec4(1.0, 0.0, 0.0, 0.0),
+	vec4(0.0, 1.0, 0.0, 0.0),
+	vec4(0.0, 0.0, 1.0, 0.0),
+	vec4(0.0, -1.0 / lightPos[1], 0.0, 0.0)
+);
+const shadowMatZ = mat4(
+	vec4(1.0, 0.0, 0.0, 0.0),
+	vec4(0.0, 1.0, 0.0, 0.0),
+	vec4(0.0, 0.0, 1.0, 0.0),
+	vec4(0.0, 0.0, -1.0 / lightPos[2], 0.0)
+);
+const combinedShadowMatX = mult(mult(toLightMat, shadowMatX), fromLightMat);
+const combinedShadowMatY = mult(mult(toLightMat, shadowMatY), fromLightMat);
+const combinedShadowMatZ = mult(mult(toLightMat, shadowMatZ), fromLightMat);
+
+// Planar translations for shadows
+const leftMat = translate(negx+0.1, 0, 0);
+const floorMat = translate(0, negy+0.1, 0);
+const rightMat = translate(0, 0, posz-0.1);
 
 function main() {
 	
@@ -329,6 +353,10 @@ function loadAllImages() {
 	}
 }
 
+/**
+ * Create a cubemap from either default textures, or normal textures once they've
+ * all loaded.
+ */
 function createCubemap() {
 	// If this is the first time running, create the default cubemap.
 	if (cubemap == null) {
@@ -722,18 +750,9 @@ function keypress(event) {
 		break;
 	case 'P':
 		lDeg += 0.005;
-		break;
-	case 'n':
-		setShaders("smooth-normal-shader", "frag-shader");
-		break;
-	case 'N':
-		setShaders("flat-normal-shader", "frag-shader");
-		break;
+		break;;
 	case 'x':
 		wireframe = !wireframe;
-		break;
-	case 'z':
-		setShaders("shadeless-shader", "frag-shader");
 		break;
 	case 'A':
 	case 'a':
@@ -864,9 +883,11 @@ function renderObj(obj, mat, width, depth) {
 		mat = rot;
 	}
 
+	const modelView = mult(viewMat, mat);
+
 	// Render the mesh
 	gl.uniform1i(lightOn, true);
-	renderMesh(obj.tris, mat, obj.color);
+	renderMesh(obj.tris, modelView, obj.color);
 
 	if (shadows) {
 		// Turn off reflection/refraction
@@ -875,13 +896,15 @@ function renderObj(obj, mat, width, depth) {
 		gl.uniform1i(vRefractOn, false);
 		gl.uniform1i(fRefractOn, false);
 
-		// Render the shadows
-		var lightMat = translate(lightPos[0], lightPos[1], lightPos[2]);
-		lightMat = mult(lightMat, shadowMat);
-		lightMat = mult(lightMat, translate(-lightPos[0], -lightPos[1], -lightPos[2]));
-		lightMat = mult(lightMat, mat);
+		// Render the shadows once for each plane:
 		gl.uniform1i(lightOn, false);
-		renderMesh(obj.tris, lightMat, lightAmb);
+		//renderMesh(obj.tris, mult(floorMat, mult(combinedShadowMatY, modelView)), lightAmb);
+		//renderMesh(obj.tris, mult(rightMat, mult(combinedShadowMatZ, modelView)), lightAmb);
+		//renderMesh(obj.tris, mult(leftMat, mult(combinedShadowMatX, modelView)), lightAmb);
+
+		renderMesh(obj.tris, mult(viewMat, mult(floorMat, mult(combinedShadowMatY, mat))), lightAmb);
+		renderMesh(obj.tris, mult(viewMat, mult(rightMat, mult(combinedShadowMatZ, mat))), lightAmb);
+		renderMesh(obj.tris, mult(viewMat, mult(leftMat, mult(combinedShadowMatX, mat))), lightAmb);
 
 		// Turn them back on
 		gl.uniform1i(vReflectOn, reflection);
@@ -902,10 +925,10 @@ function renderObj(obj, mat, width, depth) {
  * @param {mat4} modelMat The model matrix.
  * @param {vec4} color The color to use when texturing is disabled.
  */
-function renderMesh(mesh, modelMat, color) {
+function renderMesh(mesh, modelViewMat, color) {
 	
 	// Set uniforms.
-	gl.uniformMatrix4fv(modelView, false, flatten(mult(viewMat, modelMat)));
+	gl.uniformMatrix4fv(modelView, false, flatten(modelViewMat));
 	gl.uniform4fv(diffProd, flatten(mult(lightDiff, color)));
 	gl.uniform4fv(specProd, flatten(mult(lightSpec, color)));
 	gl.uniform4fv(ambProd, flatten(mult(lightAmb, color)));
@@ -962,12 +985,12 @@ function render() {
 	// Set texture for walls and render
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, stones);
-	renderMesh(wallMesh, sceneModelMat, vec4(0.0, 0.0, 1.0, 1.0));
+	renderMesh(wallMesh, sceneModelView, vec4(0.0, 0.0, 1.0, 1.0));
 	
 	// Set texture for floor and render
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, grass);
-	renderMesh(floorMesh, sceneModelMat, vec4(0.5, 0.5, 0.5, 1.0));
+	renderMesh(floorMesh, sceneModelView, vec4(0.5, 0.5, 0.5, 1.0));
 
 	requestAnimationFrame(render);
 }
